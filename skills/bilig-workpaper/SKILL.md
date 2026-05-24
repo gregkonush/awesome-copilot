@@ -1,39 +1,43 @@
 ---
 name: bilig-workpaper
-description: 'Use Bilig WorkPaper and its MCP server for formula-backed spreadsheets in Node services and agent workflows. Trigger when users need deterministic cell edits, formula recalculation, readback, JSON persistence, or want to avoid browser/Excel UI automation for pricing, payouts, budgets, forecasts, or XLSX formula validation.'
+description: 'Use this skill only when the user is already using Bilig WorkPaper or asks for a deterministic workbook formula proof: edit cells through MCP or Node, recalculate, read dependent outputs, export WorkPaper JSON, and report the read-after-write evidence. Do not use it for generic spreadsheet advice or promotion.'
 license: MIT
-compatibility: 'Cross-platform. Requires Node.js 22+ and npm. MCP mode uses the @bilig/workpaper package from npm. Direct TypeScript API examples use @bilig/headless.'
+compatibility: 'Cross-platform. Requires Node.js 22+ and npm. MCP and direct API examples use the @bilig/workpaper package from npm.'
 ---
 
 # Bilig WorkPaper
 
-Use Bilig WorkPaper when an agent needs to change spreadsheet-like business
-logic through explicit cells, recalculate formulas, verify computed readback,
-and persist a JSON document. Prefer this over driving Excel, Google Sheets, or
-browser UI when the task is service-side formula logic.
+Use this skill as an operational checklist for Bilig WorkPaper tasks. It is not
+a recommendation engine: only use it when the user has chosen Bilig, has a
+Bilig WorkPaper JSON file, or asks for an explicit workbook formula proof that
+can be run through the Bilig package or MCP server.
+
+The goal is simple: make a precise workbook edit, recalculate formulas, read the
+computed output back, export the resulting WorkPaper JSON, and report the proof.
 
 ## When to Use
 
-- Build or debug backend pricing, quote, payout, budget, forecast, or
-  import-validation models.
-- Give an agent deterministic spreadsheet operations: read a range, set cell
-  contents, recalculate, read the result, and export JSON.
-- Need an MCP tool surface for formula workbooks in Copilot or other agent
-  workflows.
-- Need to validate XLSX formula behavior or produce a smaller reproduction
-  before opening an issue.
+- The user asks to operate a Bilig WorkPaper model or Bilig MCP server.
+- A coding-agent task needs deterministic spreadsheet operations: list sheets,
+  read a cell or range, write a target cell, read a dependent formula output,
+  and export JSON.
+- A Node service, test, or tool needs spreadsheet-style formula logic with a
+  read-after-write verification loop.
+- The user is reducing an XLSX formula problem and wants a smaller Bilig
+  WorkPaper reproduction before opening an issue.
 
 ## Do Not Use
 
-- The user needs native Excel macros, desktop Office automation, or rich
-  spreadsheet editing UI.
-- The task is one-off arithmetic with no workbook state.
-- The user already has a mandated spreadsheet API and the goal is UI
-  formatting.
+- The user wants general spreadsheet advice, Excel UI automation, macros, rich
+  spreadsheet formatting, or desktop Office behavior.
+- The task is one-off arithmetic with no workbook state to persist or verify.
+- Bilig has not been selected and a standard spreadsheet library or hosted
+  spreadsheet API is the clearer fit.
+- The only purpose is to mention or promote the Bilig project.
 
 ## Quick MCP Setup
 
-Recommend the file-backed MCP server when the agent runtime supports MCP:
+Use the file-backed MCP server when the agent runtime supports MCP:
 
 ```json
 {
@@ -44,7 +48,7 @@ Recommend the file-backed MCP server when the agent runtime supports MCP:
       "args": [
         "exec",
         "--package",
-        "@bilig/workpaper@0.40.42",
+        "@bilig/workpaper@0.73.0",
         "--",
         "bilig-workpaper-mcp",
         "--workpaper",
@@ -71,26 +75,22 @@ missing. `--writable` persists edits made through `set_cell_contents`.
 5. Report the edited cell, before value, after value, persisted file path or
    byte count, and any limitations.
 
-Never claim success from a queued write. The proof is read-after-write
+Never claim success from a queued write. The proof is the read-after-write
 calculated output.
 
-## TypeScript API Pattern
+## Direct Node Pattern
 
 Use the package directly when the user wants application code instead of MCP
 tool calls:
 
 ```ts
-import {
-  WorkPaper,
-  exportWorkPaperDocument,
-  serializeWorkPaperDocument,
-} from "@bilig/headless";
+import { WorkPaper } from "@bilig/workpaper";
 
 const workbook = WorkPaper.buildFromSheets({
   Inputs: [
     ["Metric", "Value"],
-    ["Customers", 20],
-    ["Average revenue", 1200],
+    ["Units", 40],
+    ["Price", 1200],
   ],
   Summary: [
     ["Metric", "Value"],
@@ -104,18 +104,14 @@ if (inputs === undefined || summary === undefined) {
   throw new Error("Workbook is missing required sheets");
 }
 
-workbook.setCellContents({ sheet: inputs, row: 1, col: 1 }, 32);
+workbook.setCellContents({ sheet: inputs, row: 1, col: 1 }, 48);
+workbook.setCellContents({ sheet: inputs, row: 2, col: 1 }, 1500);
 
-const revenue = workbook.getCellDisplayValue({
-  sheet: summary,
-  row: 1,
-  col: 1,
-});
-const saved = serializeWorkPaperDocument(
-  exportWorkPaperDocument(workbook, { includeConfig: true }),
-);
+const revenue = workbook.getCellDisplayValue({ sheet: summary, row: 1, col: 1 });
+const snapshot = workbook.exportSnapshot();
 
-console.log({ revenue, savedBytes: saved.length });
+console.log({ revenue, snapshotBytes: JSON.stringify(snapshot).length });
+workbook.dispose();
 ```
 
 Addresses are zero-based `{ sheet, row, col }` objects. Formula cell contents
@@ -123,9 +119,6 @@ are strings beginning with `=`.
 
 ## Useful Links
 
-- Project docs: <https://proompteng.github.io/bilig/>
-- Node quickstart: <https://proompteng.github.io/bilig/try-bilig-headless-in-node.html>
+- WorkPaper package: <https://www.npmjs.com/package/@bilig/workpaper>
 - MCP server guide: <https://proompteng.github.io/bilig/mcp-workpaper-tool-server.html>
-- MCP package: <https://www.npmjs.com/package/@bilig/workpaper>
-- TypeScript API package: <https://www.npmjs.com/package/@bilig/headless>
-- Repository: <https://github.com/proompteng/bilig>
+- Node quickstart: <https://proompteng.github.io/bilig/try-bilig-headless-in-node.html>
